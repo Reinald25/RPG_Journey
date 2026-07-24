@@ -1,0 +1,228 @@
+# RPG Journey — Auditoría + Sistema de Misiones (Template Method)
+
+## Resumen del Proyecto Actual
+
+RPG Journey es un juego RPG por turnos en Java con interfaz Swing. El jugador elige una clase (Guerrero, Mago, Asesino, Tanque, Curandero, Soporte), combate enemigos aleatorios, gestiona un inventario con pila (Stack), gana XP, sube de nivel y puede enfrentarse a Jefes (Boss).
+
+---
+
+## 🔍 Auditoría del Código Actual
+
+### Estructura de Paquetes (Estado Actual)
+
+
+src/com/rpg/
+├── gui/
+│   ├── Main.java               ← Punto de entrada + selección de clase
+│   ├── VentanaJuego.java       ← 1233 líneas (GOD CLASS)
+│   └── BarraProgresoRPG.java
+└── logica/
+    ├── AccionEspecial.java     ← Interfaz
+    ├── Personaje.java          ← Abstract base
+    ├── Guerrero.java
+    ├── Mago.java
+    ├── Asesino.java
+    ├── Tanque.java
+    ├── Curandero.java
+    ├── Soporte.java
+    ├── Enemigo.java
+    ├── EnemigoBoss.java        ← Abstract
+    ├── JefeDragon.java
+    ├── Item.java               ← Abstract
+    ├── Pocion.java
+    ├── MejoraStat.java
+    └── Arma.java
+
+
+### ✅ Patrones de Diseño ya presentes
+
+| Patrón | Dónde se usa | Descripción |
+|--------|-------------|-------------|
+| *Template Method* (parcial) | Personaje → Personaje.subirNivel() | Cada subclase puede anular el comportamiento base |
+| *Template Method* (parcial) | EnemigoBoss → ataqueEspecial() | Contrato abstracto que los jefes deben implementar |
+| *Strategy / Polimorfismo* | AccionEspecial (interfaz) | Cada clase implementa su propia acción especial |
+| *Herencia + Abstract* | Personaje, Item, EnemigoBoss | Jerarquía clara de clases |
+| *Composite / Agregación* | Personaje tiene Arma, Stack<Item>, HashSet<String> | Relaciones de composición |
+
+### ⚠️ Problemas Detectados (Oportunidades de Mejora)
+
+| # | Problema | Impacto | Archivo |
+|---|----------|---------|---------|
+| 1 | *God Class*: VentanaJuego tiene 1233 líneas con lógica de negocio mezclada con la vista | Alto | VentanaJuego.java |
+| 2 | *No existe Sistema de Misiones*: El flujo Inicio→Desarrollo→Fin del combate no está encapsulado como entidad | Alto | — |
+| 3 | *Sin separación de paquetes*: gui y logica son los únicos paquetes; falta granularidad | Medio | Estructura |
+| 4 | *Lógica de combate en la GUI*: ejecutarAccionAtacar(), hacerDañoAlEnemigo() están en VentanaJuego | Alto | VentanaJuego.java |
+| 5 | *Sin enum para estados*: El estado de la misión/combate se gestiona con if-else directos | Bajo | VentanaJuego.java |
+| 6 | *Clases sin javadoc*: Clases de personaje (Guerrero, Mago, etc.) carecen de documentación | Bajo | logica/ |
+
+---
+
+## 🗂️ Nueva Estructura de Carpetas Propuesta
+
+
+src/com/rpg/
+├── gui/                          ← Capa de vista (Swing)
+│   ├── Main.java
+│   ├── VentanaJuego.java         ← Simplificada (solo UI)
+│   └── componentes/              ← [NUEVA] Componentes UI reutilizables
+│       └── BarraProgresoRPG.java
+│
+├── logica/                       ← Lógica de dominio
+│   ├── personaje/                ← [NUEVA] Subpaquete de personajes
+│   │   ├── Personaje.java
+│   │   ├── Guerrero.java
+│   │   ├── Mago.java
+│   │   ├── Asesino.java
+│   │   ├── Tanque.java
+│   │   ├── Curandero.java
+│   │   └── Soporte.java
+│   ├── enemigo/                  ← [NUEVA] Subpaquete de enemigos
+│   │   ├── Enemigo.java
+│   │   ├── EnemigoBoss.java
+│   │   └── JefeDragon.java
+│   ├── item/                     ← [NUEVA] Subpaquete de ítems
+│   │   ├── Item.java
+│   │   ├── Pocion.java
+│   │   ├── MejoraStat.java
+│   │   └── Arma.java
+│   └── contrato/                 ← [NUEVA] Interfaces/contratos
+│       └── AccionEspecial.java
+│
+└── mision/                       ← [NUEVA] Sistema de Misiones (Template Method)
+    ├── Mision.java               ← Clase abstracta Template Method
+    ├── EstadoMision.java         ← Enum de estados
+    ├── MisionCombate.java        ← Mision estándar de combate
+    ├── MisionEliminarBoss.java   ← Mision de jefe final
+    └── MisionSobrevivir.java     ← Mision de supervivencia con rondas
+
+
+---
+
+## 🏗️ Diseño del Sistema de Misiones — Template Method
+
+### Clase Abstracta: Mision.java
+
+El *Template Method* define el flujo fijo *Inicio → Desarrollo → Fin* y delega los pasos específicos a las subclases.
+
+java
+package com.rpg.mision;
+
+public abstract class Mision {
+
+    private String nombre;
+    private String descripcion;
+    private EstadoMision estado;
+
+    // ══════════════════════════════════
+    //  TEMPLATE METHOD (flujo fijo)
+    // ══════════════════════════════════
+    public final void ejecutar(Personaje jugador) {
+        estado = EstadoMision.EN_PROGRESO;
+        iniciarMision(jugador);          // Hook obligatorio
+        boolean exito = desarrollarMision(jugador); // Hook obligatorio
+        finalizarMision(jugador, exito); // Hook obligatorio
+        estado = exito ? EstadoMision.COMPLETADA : EstadoMision.FALLIDA;
+    }
+
+    // ══════════════════════════════════
+    //  Métodos abstractos (subclases)
+    // ══════════════════════════════════
+    protected abstract void iniciarMision(Personaje jugador);
+    protected abstract boolean desarrollarMision(Personaje jugador);
+    protected abstract void finalizarMision(Personaje jugador, boolean exito);
+
+    // ══════════════════════════════════
+    //  Hook opcional (puede sobreescribir)
+    // ══════════════════════════════════
+    protected void onRecompensa(Personaje jugador) {
+        // Sin recompensa por defecto
+    }
+    
+    // Getters ...
+}
+
+
+### Enum: EstadoMision.java
+
+java
+public enum EstadoMision {
+    PENDIENTE, EN_PROGRESO, COMPLETADA, FALLIDA
+}
+
+
+### Subclases concretas
+
+| Clase | Descripción |
+|-------|-------------|
+| MisionCombate | Eliminar N enemigos normales. Usa recompensa de oro/XP. |
+| MisionEliminarBoss | Derrotar al JefeDragon. Recompensa especial de boss. |
+| MisionSobrevivir | Sobrevivir N rondas de combate consecutivas. |
+
+---
+
+## 📋 Cambios Propuestos
+
+### Fase 1 — Reorganizar paquetes (sin romper nada)
+
+#### [MODIFY] Todos los .java en logica/
+- Actualizar package de com.rpg.logica → subpaquetes
+- Actualizar import en VentanaJuego.java y Main.java
+
+#### [MODIFY] BarraProgresoRPG.java
+- Mover a gui/componentes/
+- Actualizar package e import
+
+### Fase 2 — Implementar Sistema de Misiones
+
+#### [NEW] src/com/rpg/mision/EstadoMision.java
+Enum con valores: PENDIENTE, EN_PROGRESO, COMPLETADA, FALLIDA
+
+#### [NEW] src/com/rpg/mision/Mision.java
+Clase abstracta con el Template Method. Contiene:
+- ejecutar(Personaje) → flujo fijo final
+- iniciarMision(), desarrollarMision(), finalizarMision() → abstractos
+- onRecompensa() → hook opcional
+
+#### [NEW] src/com/rpg/mision/MisionCombate.java
+- Mata N enemigos (configurable)
+- Recompensa: XP + ítem botín extra
+
+#### [NEW] src/com/rpg/mision/MisionEliminarBoss.java
+- Mata al JefeDragon
+- Recompensa masiva de XP y oro
+
+#### [NEW] src/com/rpg/mision/MisionSobrevivir.java
+- Sobrevive N rondas sin morir
+- Recompensa: mejora de stat aleatoria
+
+#### [MODIFY] VentanaJuego.java
+- Agregar panel de Misiones en la UI (nueva pestaña o sección)
+- Mostrar misión activa, descripción, progreso y estado
+- Conectar la lógica de hacerDañoAlEnemigo() con el progreso de la misión activa
+
+---
+
+## ✅ Plan de verificación
+
+### Funcional
+- [ ] Las misiones siguen el flujo PENDIENTE → EN_PROGRESO → COMPLETADA/FALLIDA
+- [ ] No se puede saltear el orden del Template Method
+- [ ] Las recompensas solo se aplican al completar
+
+### Compilación
+bash
+javac -sourcepath src -d out src/com/rpg/gui/Main.java
+
+
+### Manual
+- Iniciar el juego y verificar que la selección de clase sigue funcionando
+- Verificar que aparece la misión activa en la UI
+- Completar una misión y confirmar que el estado cambia a COMPLETADA
+
+---
+
+> [!IMPORTANT]
+> La reorganización de paquetes cambiará las declaraciones package y los import en todos los archivos. Esto *no es un cambio de lógica* pero requiere atención para no romper la compilación.
+
+> [!NOTE]
+> El Template Method se implementa en la *capa mision/* completamente separado de la GUI. La VentanaJuego solo llama mision.ejecutar(jugador) y observa mision.getEstado() para refrescar la UI.
