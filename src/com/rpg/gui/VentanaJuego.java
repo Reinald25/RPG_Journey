@@ -14,6 +14,7 @@ import com.rpg.mision.Mision;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -92,11 +93,13 @@ public class VentanaJuego extends JFrame implements IVistaJuego {
     private JComboBox<String> comboInventario;
     private JButton btnUsarItem;
 
-    // ─── Botones de Acción ────────────────────────────────────────────────────
+    // ─── Botones de Acción ────────────────────────────────────────────────────────────
     private JButton btnAtacar;
     private JButton btnHabilidad;
     private JButton btnGenerarEnemigo;
     private JButton btnNuevoPersonaje;
+    private JButton btnGuardar;
+    private JButton btnCargar;
 
     // ══════════════════════════════════════════════════════════════════════════
     //  Constructor
@@ -447,7 +450,14 @@ public class VentanaJuego extends JFrame implements IVistaJuego {
         btnDesequiparAccesorio = (JButton) ((BorderLayout) panelAccesorio.getLayout()).getLayoutComponent(BorderLayout.EAST);
         center.add(panelAccesorio, gbc);
 
-        card.add(center, BorderLayout.CENTER);
+        JScrollPane scrollCenter = new JScrollPane(center);
+        scrollCenter.setBorder(null);
+        scrollCenter.setOpaque(false);
+        scrollCenter.getViewport().setOpaque(false);
+        scrollCenter.getVerticalScrollBar().setUnitIncrement(12);
+        scrollCenter.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        card.add(scrollCenter, BorderLayout.CENTER);
+
         return card;
     }
 
@@ -509,9 +519,9 @@ public class VentanaJuego extends JFrame implements IVistaJuego {
     }
 
     private JPanel crearPanelBotones() {
-        JPanel panelBotones = new JPanel(new GridLayout(1, 6, 10, 0));
+        JPanel panelBotones = new JPanel(new GridLayout(2, 4, 10, 8));
         panelBotones.setBackground(BG_DARK);
-        panelBotones.setPreferredSize(new Dimension(0, 50));
+        panelBotones.setPreferredSize(new Dimension(0, 100));
 
         btnAtacar        = crearBoton("Atacar ⚔️", ACCENT_RED);
         btnHabilidad     = crearBoton("Habilidad ✨", ACCENT_BLUE);
@@ -519,6 +529,8 @@ public class VentanaJuego extends JFrame implements IVistaJuego {
         btnUsarItem      = crearBoton("Usar Ítem 🧪", ACCENT_GREEN);
         btnGenerarEnemigo = crearBoton("Nuevo Enemigo 👺", ACCENT_BLUE);
         btnNuevoPersonaje = crearBoton("Nuevo Personaje 👤", TEXT_MUTED);
+        btnGuardar       = crearBoton("Guardar 💾", ACCENT_YELLOW);
+        btnCargar        = crearBoton("Cargar 📂", ACCENT_PURPLE);
 
         panelBotones.add(btnAtacar);
         panelBotones.add(btnHabilidad);
@@ -526,6 +538,8 @@ public class VentanaJuego extends JFrame implements IVistaJuego {
         panelBotones.add(btnUsarItem);
         panelBotones.add(btnGenerarEnemigo);
         panelBotones.add(btnNuevoPersonaje);
+        panelBotones.add(btnGuardar);
+        panelBotones.add(btnCargar);
 
         return panelBotones;
     }
@@ -557,6 +571,31 @@ public class VentanaJuego extends JFrame implements IVistaJuego {
         btnDesequiparArma.addActionListener(e -> controlador.desequipar(TipoSlot.ARMA));
         btnDesequiparArmadura.addActionListener(e -> controlador.desequipar(TipoSlot.ARMADURA));
         btnDesequiparAccesorio.addActionListener(e -> controlador.desequipar(TipoSlot.ACCESORIO));
+
+        // Guardar partida — abre JFileChooser para seleccionar archivo de guardado
+        btnGuardar.addActionListener(e -> {
+            JFileChooser fileChooser = crearFileChooserJson();
+            fileChooser.setDialogTitle("Guardar Partida");
+            int resultado = fileChooser.showSaveDialog(this);
+            if (resultado == JFileChooser.APPROVE_OPTION) {
+                String ruta = fileChooser.getSelectedFile().getAbsolutePath();
+                if (!ruta.toLowerCase().endsWith(".json")) {
+                    ruta += ".json";
+                }
+                controlador.guardarPartida(ruta);
+            }
+        });
+
+        // Cargar partida — abre JFileChooser para seleccionar archivo JSON
+        btnCargar.addActionListener(e -> {
+            JFileChooser fileChooser = crearFileChooserJson();
+            fileChooser.setDialogTitle("Cargar Partida");
+            int resultado = fileChooser.showOpenDialog(this);
+            if (resultado == JFileChooser.APPROVE_OPTION) {
+                String ruta = fileChooser.getSelectedFile().getAbsolutePath();
+                controlador.cargarPartida(ruta);
+            }
+        });
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -764,6 +803,16 @@ public class VentanaJuego extends JFrame implements IVistaJuego {
         panel.add(lbl, BorderLayout.CENTER);
         panel.add(btn, BorderLayout.EAST);
         return panel;
+    }
+
+    /**
+     * Crea un JFileChooser preconfigurado con filtro .json y estilo oscuro.
+     */
+    private JFileChooser crearFileChooserJson() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setFileFilter(new FileNameExtensionFilter("Archivos JSON (*.json)", "json"));
+        fileChooser.setAcceptAllFileFilterUsed(false);
+        return fileChooser;
     }
 
     private JComboBox<String> crearComboInventario() {

@@ -14,6 +14,8 @@ import com.rpg.mision.Mision;
 import com.rpg.mision.MisionCombate;
 import com.rpg.mision.MisionEliminarBoss;
 import com.rpg.mision.MisionSobrevivir;
+import com.rpg.persistencia.EstadoPartida;
+import com.rpg.persistencia.ServicioGuardado;
 
 /**
  * <b>Controlador de Combate</b> — capa de control del patrón MVC.
@@ -372,6 +374,66 @@ public class ControladorCombate {
      */
     private boolean esBoss() {
         return enemigoActual instanceof JefeDragon;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  Guardado y Carga de partida (Gson)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /** Servicio de persistencia — instanciado bajo demanda. */
+    private ServicioGuardado servicioGuardado;
+
+    private ServicioGuardado getServicioGuardado() {
+        if (servicioGuardado == null) {
+            servicioGuardado = new ServicioGuardado();
+        }
+        return servicioGuardado;
+    }
+
+    /**
+     * Guarda el estado completo de la partida (jugador, enemigo, misión) en
+     * un archivo JSON usando Gson.
+     *
+     * @param rutaArchivo Ruta absoluta del archivo de guardado.
+     */
+    public void guardarPartida(String rutaArchivo) {
+        try {
+            getServicioGuardado().guardarPartida(jugador, enemigoActual, misionActiva, rutaArchivo);
+            vista.mostrarMensaje("SISTEMA", "💾 ¡Partida guardada exitosamente!");
+        } catch (Exception e) {
+            vista.mostrarMensaje("ERROR", "❌ Error al guardar la partida: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Carga una partida previamente guardada desde un archivo JSON y restaura
+     * todo el estado del juego (jugador, enemigo, misión activa).
+     *
+     * @param rutaArchivo Ruta absoluta del archivo JSON a cargar.
+     */
+    public void cargarPartida(String rutaArchivo) {
+        try {
+            EstadoPartida estado = getServicioGuardado().cargarPartida(rutaArchivo);
+
+            this.jugador = estado.getJugador();
+            this.enemigoActual = estado.getEnemigo();
+            this.misionActiva = estado.getMisionActiva();
+
+            vista.limpiarLog();
+            vista.mostrarMensaje("SISTEMA", "📂 ¡Partida cargada exitosamente!");
+            vista.mostrarMensaje("SISTEMA",
+                "Guardado del: " + estado.getFechaGuardado()
+                + " — Héroe: " + jugador.getNombre() + " (" + jugador.getClase()
+                + ") Nivel " + jugador.getNivel());
+            if (enemigoActual != null && enemigoActual.getPuntosVida() > 0) {
+                vista.mostrarMensaje("SISTEMA",
+                    "Enemigo activo: " + enemigoActual.getNombre()
+                    + " (Nivel " + enemigoActual.getNivel() + ")");
+            }
+            vista.actualizarUI();
+        } catch (Exception e) {
+            vista.mostrarMensaje("ERROR", "❌ Error al cargar la partida: " + e.getMessage());
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
